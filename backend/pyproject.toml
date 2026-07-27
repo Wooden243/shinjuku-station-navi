@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shinjuku-open-nav-api"
+version = "1.0.0"
+description = "東京都オープンデータを用いた新宿駅階層別歩行経路API"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "geopandas>=1.0,<2",
+  "networkx>=3.3,<4",
+  "pydantic>=2.8,<3",
+  "pyproj>=3.6,<4",
+  "shapely>=2.0,<3",
+  "uvicorn[standard]>=0.35,<1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8.3,<9",
+  "ruff>=0.12,<1"
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+

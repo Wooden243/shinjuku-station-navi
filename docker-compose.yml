@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      SHINJUKU_DATA_DIR: /app/data/processed
+      SHINJUKU_SAMPLE_DATA_DIR: /app/data/sample
+    volumes:
+      - ./data:/app/data:ro
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    environment:
+      BACKEND_URL: http://backend:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

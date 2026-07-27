@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: shinjuku-open-nav-api
+Version: 1.0.0
+Summary: 東京都オープンデータを用いた新宿駅階層別歩行経路API
+Requires-Python: >=3.11
+Requires-Dist: fastapi<1,>=0.116
+Requires-Dist: geopandas<2,>=1.0
+Requires-Dist: networkx<4,>=3.3
+Requires-Dist: pydantic<3,>=2.8
+Requires-Dist: pyproj<4,>=3.6
+Requires-Dist: shapely<3,>=2.0
+Requires-Dist: uvicorn[standard]<1,>=0.35
+Provides-Extra: dev
+Requires-Dist: httpx<1,>=0.28; extra == "dev"
+Requires-Dist: pytest<9,>=8.3; extra == "dev"
+Requires-Dist: ruff<1,>=0.12; extra == "dev"

@@ -1,0 +1,12 @@
+fastapi<1,>=0.116
+geopandas<2,>=1.0
+networkx<4,>=3.3
+pydantic<3,>=2.8
+pyproj<4,>=3.6
+shapely<3,>=2.0
+uvicorn[standard]<1,>=0.35
+
+[dev]
+httpx<1,>=0.28
+pytest<9,>=8.3
+ruff<1,>=0.12

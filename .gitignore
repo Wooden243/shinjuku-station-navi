@@ -1,0 +1,17 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+node_modules/
+frontend/dist/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+frontend/.env.local
+data/raw/*.geojson
+data/processed/*.geojson
+data/processed/*.json
+!data/processed/.gitkeep
+!data/processed/manifest.json
+!data/processed/classification-report.json

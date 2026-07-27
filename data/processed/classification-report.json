@@ -1,0 +1,25 @@
+{
+  "unclassified_gates": [
+    28993448,
+    28993449,
+    28993450,
+    29087939,
+    29008232,
+    29008233
+  ],
+  "skipped_exits": [
+    {
+      "geometry_id": 28994950,
+      "entity_id": 1760730,
+      "name": "RL"
+    },
+    {
+      "geometry_id": 28994952,
+      "entity_id": 1760731,
+      "name": "PL"
+    }
+  ],
+  "generated_at": "2026-07-27T11:08:48.850483+00:00",
+  "classified_gate_count": 31,
+  "classified_exit_count": 35
+}

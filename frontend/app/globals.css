@@ -1,0 +1,61 @@
+:root {
+  --ink: #13202b;
+  --ink-muted: #5d6975;
+  --muted: #5d6975;
+  --paper: #f4f1ea;
+  --surface: #ffffff;
+  --navy: #102f45;
+  --blue: #0877b9;
+  --orange: #ed6a34;
+  --red: #d62f31;
+  --line: #d4d9dc;
+  --focus: #ffbf47;
+  color: var(--ink);
+  background: var(--paper);
+  font-family:
+    "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--paper);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+select {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  color: white;
+  background: var(--blue);
+}

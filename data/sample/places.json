@@ -1,0 +1,7 @@
+[
+  {"id":"sample-gate-west","type":"gate","name":"西側改札（要現地確認）","operator":"未設定","floor":"B1","lon":139.69974,"lat":35.69009,"node_id":"n1","snap_distance_m":0.0,"verified_on_site":false},
+  {"id":"sample-gate-east","type":"gate","name":"東側改札（要現地確認）","operator":"未設定","floor":"B1","lon":139.70120,"lat":35.69005,"node_id":"n4","snap_distance_m":0.0,"verified_on_site":false},
+  {"id":"sample-exit-a1","type":"exit","name":"A1出口（要現地確認）","operator":"未設定","floor":"1F","lon":139.70070,"lat":35.69100,"node_id":"n6","snap_distance_m":0.0,"verified_on_site":false},
+  {"id":"sample-exit-west","type":"exit","name":"西口地上出口（要現地確認）","operator":"未設定","floor":"1F","lon":139.69890,"lat":35.69040,"node_id":"n7","snap_distance_m":0.0,"verified_on_site":false}
+]
+

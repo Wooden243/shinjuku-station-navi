@@ -1,0 +1,13 @@
+{
+  "data_mode": "sample",
+  "title": "動作確認専用の小規模ネットワーク",
+  "provider": "Shinjuku Open Nav project",
+  "license": "MIT",
+  "dataset_last_updated": null,
+  "generated_at": "2026-07-27T00:00:00+09:00",
+  "warnings": [
+    "このデータはオープンデータの実データではありません。",
+    "改札名、出口名、座標は提出前に公開情報と現地調査で検証してください。"
+  ]
+}
+

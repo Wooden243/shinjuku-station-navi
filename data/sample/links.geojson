@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"id":"l1","source":"n1","target":"n2","floor":"B1","length_m":42.0,"direction":"both","link_type":"corridor"},"geometry":{"type":"LineString","coordinates":[[139.69974,35.69009],[139.70020,35.69010]]}},
+    {"type":"Feature","properties":{"id":"l2","source":"n2","target":"n3","floor":"B1","length_m":46.0,"direction":"both","link_type":"corridor"},"geometry":{"type":"LineString","coordinates":[[139.70020,35.69010],[139.70070,35.69012]]}},
+    {"type":"Feature","properties":{"id":"l3","source":"n3","target":"n4","floor":"B1","length_m":46.0,"direction":"both","link_type":"corridor"},"geometry":{"type":"LineString","coordinates":[[139.70070,35.69012],[139.70120,35.69005]]}},
+    {"type":"Feature","properties":{"id":"l4","source":"n3","target":"n5","floor":"B1/1F","length_m":54.0,"direction":"both","link_type":"stairs"},"geometry":{"type":"LineString","coordinates":[[139.70070,35.69012],[139.70070,35.69055]]}},
+    {"type":"Feature","properties":{"id":"l5","source":"n5","target":"n6","floor":"1F","length_m":50.0,"direction":"both","link_type":"corridor"},"geometry":{"type":"LineString","coordinates":[[139.70070,35.69055],[139.70070,35.69100]]}},
+    {"type":"Feature","properties":{"id":"l6","source":"n1","target":"n8","floor":"B1","length_m":44.0,"direction":"both","link_type":"corridor"},"geometry":{"type":"LineString","coordinates":[[139.69974,35.69009],[139.69930,35.69025]]}},
+    {"type":"Feature","properties":{"id":"l7","source":"n8","target":"n7","floor":"B1/1F","length_m":52.0,"direction":"both","link_type":"elevator"},"geometry":{"type":"LineString","coordinates":[[139.69930,35.69025],[139.69890,35.69040]]}}
+  ]
+}
+

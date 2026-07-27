@@ -1,0 +1,26 @@
+{
+  "dataset": {
+    "title": "新宿駅周辺の施設情報等",
+    "provider": "東京都都市整備局",
+    "catalog_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000008d0000000037",
+    "license": "クリエイティブ・コモンズ 表示（CC BY）",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/deed.ja",
+    "specification_revision": "令和5年2月改訂版",
+    "catalog_last_checked": "2026-07-27"
+  },
+  "resources": [
+    {
+      "name": "shinjuku_terminal_open_data",
+      "format": "ZIP",
+      "url": "https://www.toshiseibi.metro.tokyo.lg.jp/kiban/shinjuku_terminal/pdf/shisetsu_root.zip",
+      "filename": "shisetsu_root.zip"
+    },
+    {
+      "name": "data_specification",
+      "format": "PDF",
+      "url": "https://www.toshiseibi.metro.tokyo.lg.jp/kiban/shinjuku_terminal/pdf/shisetsu_siyousho.pdf",
+      "filename": "shisetsu_siyousho.pdf"
+    }
+  ]
+}
+

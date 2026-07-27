@@ -1,0 +1,37 @@
+{
+  "dataset": {
+    "title": "新宿駅周辺の施設情報等",
+    "provider": "東京都都市整備局",
+    "catalog_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000008d0000000037",
+    "license": "クリエイティブ・コモンズ 表示（CC BY）",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/deed.ja",
+    "specification_revision": "令和5年2月改訂版",
+    "catalog_last_checked": "2026-07-27"
+  },
+  "resources": [
+    {
+      "name": "shinjuku_terminal_open_data",
+      "format": "ZIP",
+      "url": "https://www.toshiseibi.metro.tokyo.lg.jp/kiban/shinjuku_terminal/pdf/shisetsu_root.zip",
+      "filename": "shisetsu_root.zip",
+      "retrieved_at": "2026-07-27T11:02:14.135566+00:00",
+      "sha256": "fc3466270c08593a300e652c7997021f85151bf0f435e17ee9fcb7935ed4ba31",
+      "bytes": 2317035,
+      "http": {}
+    },
+    {
+      "name": "data_specification",
+      "format": "PDF",
+      "url": "https://www.toshiseibi.metro.tokyo.lg.jp/kiban/shinjuku_terminal/pdf/shisetsu_siyousho.pdf",
+      "filename": "shisetsu_siyousho.pdf",
+      "retrieved_at": "2026-07-27T11:02:14.135566+00:00",
+      "sha256": "c9258624d2eeacb3759f9c5c8e84c757c3caef1274574153206509ed55273095",
+      "bytes": 499924,
+      "http": {}
+    }
+  ],
+  "warnings": [
+    "公開データは調査時点の情報であり、現況と異なる可能性があります。",
+    "原本ZIPの内部ディレクトリ名はレガシー文字コードのため、正規化処理はファイル末尾名で識別します。"
+  ]
+}
