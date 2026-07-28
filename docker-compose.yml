@@ -1,24 +1,30 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: shinjuku_nav
+      POSTGRES_USER: shinjuku_nav
+      POSTGRES_PASSWORD: local-development-only
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
+      DATABASE_URL: postgresql+psycopg://shinjuku_nav:local-development-only@postgres:5432/shinjuku_nav
+      SHINJUKU_ADMIN_KEY: local-development-change-me
+      SHINJUKU_SESSION_SECRET: local-session-secret-change-me
+      SHINJUKU_CLIENT_HASH_SALT: local-client-salt-change-me
       SHINJUKU_DATA_DIR: /app/data/processed
-      SHINJUKU_SAMPLE_DATA_DIR: /app/data/sample
-    volumes:
-      - ./data:/app/data:ro
-    ports:
-      - "8000:8000"
-
+    ports: ["8000:8000"]
+    depends_on: [postgres]
   frontend:
     build:
       context: ./frontend
       args:
         BACKEND_URL: http://backend:8000
-    environment:
-      BACKEND_URL: http://backend:8000
-      NEXT_TELEMETRY_DISABLED: "1"
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
+    ports: ["3000:3000"]
+    depends_on: [backend]
+volumes:
+  postgres_data:

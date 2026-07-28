@@ -3,10 +3,13 @@
     "title": "新宿駅周辺の施設情報等",
     "provider": "東京都都市整備局",
     "catalog_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000008d0000000037",
+    "official_page_url": "https://www.toshiseibi.metro.tokyo.lg.jp/kotsu_butsuryu/kotsuseisaku/kotsu_suishin/shinjuku_shisetsu",
     "license": "クリエイティブ・コモンズ 表示（CC BY）",
     "license_url": "https://creativecommons.org/licenses/by/4.0/deed.ja",
     "specification_revision": "令和5年2月改訂版",
-    "catalog_last_checked": "2026-07-27"
+    "published_at": "2023-02-28",
+    "resource_updated_at": "2023-02-20T18:55:00Z",
+    "catalog_last_checked": "2026-07-28"
   },
   "resources": [
     {
@@ -23,4 +26,3 @@
     }
   ]
 }
-

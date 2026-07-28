@@ -1,0 +1,29 @@
+databases:
+  - name: shinjuku-nav-db
+    plan: starter
+    databaseName: shinjuku_nav
+    user: shinjuku_nav
+services:
+  - type: web
+    name: shinjuku-nav-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shinjuku-nav-db
+          property: connectionString
+      - key: SHINJUKU_ENV
+        value: production
+      - key: SHINJUKU_AUTH_MODE
+        value: oidc-proxy
+      - key: SHINJUKU_CORS_ORIGINS
+        sync: false
+      - key: SHINJUKU_SESSION_SECRET
+        generateValue: true
+      - key: SHINJUKU_CLIENT_HASH_SALT
+        generateValue: true
+      - key: SHINJUKU_AUTH_PROXY_SHARED_SECRET
+        generateValue: true

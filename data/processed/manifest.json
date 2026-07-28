@@ -6,7 +6,9 @@
   "license": "クリエイティブ・コモンズ 表示（CC BY）",
   "license_url": "https://creativecommons.org/licenses/by/4.0/deed.ja",
   "specification_revision": "令和5年2月改訂版",
-  "generated_at": "2026-07-27T11:08:48.850483+00:00",
+  "generated_at": "2026-07-27T15:40:46.194038+00:00",
+  "dataset_version": "fc3466270c08593a-map-62",
+  "source_updated_at": "2023-02-20T18:55:00Z",
   "crs": "EPSG:4326",
   "distance_unit": "meter",
   "raw_resource": {
@@ -25,7 +27,9 @@
   "link_count": 2647,
   "gate_count": 31,
   "exit_count": 35,
+  "facility_count": 1188,
   "landmark_count": 1484,
+  "manual_override_count": 0,
   "floors": [
     "B5",
     "B4",
@@ -69,6 +73,51 @@
     "node_coordinates": "Nav Mercator -> drawing affine -> WGS84 affine",
     "link_distance": "public dm; WGS84 geodesic only for invalid/missing dm",
     "unknown_floors": "rejected",
-    "manual_overrides": "data\\overrides\\place_overrides.csv"
-  }
+    "manual_overrides": "data\\overrides\\place_overrides.csv",
+    "facility_entities": "named Community Entities with public details plus explicit facility geometries; no sample shops",
+    "exit_nearby_landmarks": "up to three non-equipment public facilities within 60 meters; reported as derived open data, not as an exit direction"
+  },
+  "outputs": [
+    {
+      "filename": "nodes.geojson",
+      "sha256": "2cd0dd29f2bef66f7b324de60f9c78ff8f2b68a3d121a7732c4abf6079ff6d61",
+      "bytes": 909304,
+      "count": 2506
+    },
+    {
+      "filename": "links.geojson",
+      "sha256": "5582f2c358c831e83d39cc61a788575fa5b2d3c1ce4739ebe840bbaa88e32c40",
+      "bytes": 1793065,
+      "count": 2647
+    },
+    {
+      "filename": "places.json",
+      "sha256": "e3efc963d2aa658a8cbdb9759563ded019fc829350ae0ce66f932f5b97f16641",
+      "bytes": 104840,
+      "count": 66
+    },
+    {
+      "filename": "facilities.json",
+      "sha256": "11253f9ace0d02062e6ff19aa10c80e72f5dd11aadee8213a12fcddcff590cde",
+      "bytes": 1513971,
+      "count": 1188
+    },
+    {
+      "filename": "landmarks.json",
+      "sha256": "52bfb20686a8b22450927798943fcf275f852090620c2d712a008efb32f425df",
+      "bytes": 473880,
+      "count": 1484
+    },
+    {
+      "filename": "floor_map.geojson",
+      "sha256": "5a74739c97d9699c0d49a3fcea4661214637ecc08f3cb2ba734415882ee66c81",
+      "bytes": 1077940,
+      "count": 1176
+    },
+    {
+      "filename": "classification-report.json",
+      "sha256": "a6dd23b95783afedd486b3d3e2a4651ee961f9f9908035077d1e7e4bc29a4dec",
+      "bytes": 465
+    }
+  ]
 }

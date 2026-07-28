@@ -1,2 +1,1 @@
-source_entity_id,place_type,action,name,operator,direction,floor,lon,lat,node_id,verified_on_site,evidence_url,verified_at,note
-
+source_entity_id,place_type,action,name,official_name,operator,direction,road_or_direction,equipment,accessibility,available_hours,closure_notes,floor,lon,lat,node_id,verified_on_site,evidence_url,verified_at,note

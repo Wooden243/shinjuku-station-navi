@@ -1,180 +1,95 @@
-# Shinjuku Open Nav
+# 新宿地下ナビ
 
-東京都オープンデータ・ハッカソンへの提出を想定した、新宿駅周辺の階層別歩行ナビゲーションMVPです。
+東京都都市整備局のオープンデータ「新宿駅周辺の施設情報等」を加工し、改札から出口までを階層別に案内するアプリです。出口詳細、施設検索、方向矢印、階層移動、利用者投稿、管理者審査、PWAオフライン経路探索を備えます。
 
-利用者が出発地点（改札）と目的地点（出口）を選ぶと、東京都都市整備局「新宿駅周辺の施設情報等」のオープンデータから最短経路を計算し、階層別2D地図に表示します。
+> 経路・営業時間・閉鎖情報は最新とは限りません。緊急時は現地表示と係員の指示を優先してください。GPS、氏名、メールアドレスは取得しません。
 
-## 重要な状態表示
+## Windowsで初回起動
 
-- `open-data`: 取得・正規化済みの公開データを使用
-- `sample`: 同梱の小規模な動作確認用データを使用
-
-`sample`をハッカソンの実データ動作として提出しないでください。画面上部と`GET /api/health`にデータ状態が表示されます。
-
-## 使用するオープンデータ
-
-主データ:
-
-- 名称: 新宿駅周辺の施設情報等
-- 提供者: 東京都都市整備局
-- カタログ: https://catalog.data.metro.tokyo.lg.jp/dataset/t000008d0000000037
-- ライセンス: クリエイティブ・コモンズ 表示（CC BY 4.0）
-- リソース: `shisetsu_root.zip`、`shisetsu_siyousho.pdf`
-- 取得日、SHA-256、仕様改訂、変換警告は `data/raw/manifest.json` と `data/processed/manifest.json` に記録
-
-補助データ:
-
-- `data/overrides/places.csv`
-- 改札・出口をネットワークへ結び付ける、人手確認可能な補正表
-- `source_url`、`verified_on_site`、`note`を必須管理項目とする
-
-公開原本は`data/raw/`、正規化結果は`data/processed/`、人手補正は`data/overrides/`に分離します。
-
-## 1. 必要環境
-
-- Python 3.11以上
-- Node.js 20以上
-- pnpm 10（Corepackで有効化）
-- Windows PowerShell 7、macOS、Linuxのいずれか
-
-## 2. Python環境の準備
+PowerShellを2つ開きます。
 
 ```powershell
-cd shinjuku-open-nav
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-cd ..
+cd C:\Users\aiue1\shinjuku_navi_app
+Copy-Item .env.example .env
+python -m venv backend\.venv
+backend\.venv\Scripts\python.exe -m pip install -e "backend[dev]"
+backend\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini upgrade head
+backend\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
-## 3. オープンデータの取得と変換
+別のPowerShell:
 
 ```powershell
-python scripts/fetch_open_data.py
-.\backend\.venv\Scripts\python.exe scripts/build_dataset.py
-```
-
-取得先URLは`data/sources.json`に固定し、SHA-256、取得日時、ライセンスを`data/raw/manifest.json`へ記録します。
-
-ネットワーク全域から新宿駅近傍のみを切り出す場合:
-
-```powershell
-.\backend\.venv\Scripts\python.exe scripts/build_dataset.py --center-lon 139.7006 --center-lat 35.6900 --radius-m 1800
-```
-
-変換後に以下が生成されます。
-
-```text
-data/processed/nodes.geojson
-data/processed/links.geojson
-data/processed/places.json
-data/processed/manifest.json
-```
-
-## 4. バックエンド起動
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 8000
-```
-
-- API: http://localhost:8000/api/health
-- OpenAPI: http://localhost:8000/docs
-
-## 5. フロントエンド起動
-
-別のPowerShellを開きます。
-
-```powershell
-cd frontend
+cd C:\Users\aiue1\shinjuku_navi_app\frontend
 corepack enable
-pnpm install --frozen-lockfile
+corepack pnpm install --frozen-lockfile
 Copy-Item .env.example .env.local
-pnpm dev
+corepack pnpm dev
 ```
 
-画面: http://localhost:3000
+利用者画面は `http://localhost:3000`、管理画面は `http://localhost:3000/admin`、API仕様は `http://localhost:8000/docs` です。開発用管理キーは `.env` の `SHINJUKU_ADMIN_KEY` に自分で設定します。`.env` はGitへ登録しないでください。
 
-## 6. 一括起動（Windows）
-
-依存関係をインストールした後、リポジトリ直下で実行します。
+## 2回目以降
 
 ```powershell
-.\start-dev.ps1
+cd C:\Users\aiue1\shinjuku_navi_app
+backend\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
-Docker Composeを使う場合:
+別のPowerShell:
 
 ```powershell
-docker compose up --build
+cd C:\Users\aiue1\shinjuku_navi_app\frontend
+corepack pnpm dev
 ```
 
-画面は http://localhost:3000、APIは http://localhost:8000 です。
+## 版の違い
 
-## 7. テスト
+- ローカル開発版: SQLiteと開発用キー認証。コード変更を即時反映。
+- 公開Web版: VercelのNext.jsとRenderのAPI、永続PostgreSQLを想定。
+- PWA版: HTTPSでインストール可能。初回オンライン時に経路網・地点・施設をIndexedDBへ保存。
+- Android版: Capacitor構成。`frontend/android`をAndroid Studioで開く。
+- iOS版: macOSとXcodeが必要。現在のWindows成果物にはiOSプロジェクトを含めません。
+- 管理者画面: 投稿の絞り込み、詳細・類似・公式データ比較、審査、監査、CSV/JSON出力。
+
+## データ更新
+
+原本は変更せず `data/raw` に保存し、加工結果を `data/processed`、根拠付き手動補正を `data/overrides` に分離します。
+
+```powershell
+backend\.venv\Scripts\python.exe scripts\normalize_open_data.py
+```
+
+取得URL、取得時刻、SHA-256、ライセンス、件数、警告、加工履歴は `data/raw/manifest.json` と `data/processed/manifest.json` に記録します。未知の階層や不足情報を推測で補いません。本番データにサンプル店舗は含めません。
+
+## 検証
 
 ```powershell
 cd backend
-pytest
-
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\ruff.exe check .
+.\.venv\Scripts\mypy.exe app
 cd ..\frontend
-pnpm test
-pnpm typecheck
-pnpm lint
-pnpm build
+corepack pnpm test
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm build
+corepack pnpm pwa:check
 ```
 
-## 8. API
+## 認証
 
-- `GET /api/health`: データ読込状態
-- `GET /api/gates`: 改札一覧
-- `GET /api/exits`: 出口一覧
-- `GET /api/network?floor=B1`: 表示用歩行ネットワーク
-- `POST /api/routes`: 経路計算
+ローカルの `development-key` は学習・開発専用です。キー自体をフロントエンドへ埋め込まず、ログイン成功後は署名付きHttpOnly Cookieを使います。本番では `SHINJUKU_ENV=production` と `SHINJUKU_AUTH_MODE=oidc-proxy` を設定し、認証プロキシからの署名付きヘッダーだけを受け付けます。公開前には Auth0、Microsoft Entra ID、Cloudflare Access等のOIDCと、多要素認証・権限管理を導入してください。
 
-リクエスト例:
+## 文書
 
-```json
-{
-  "start_gate_id": "sample-gate-west",
-  "destination_exit_id": "sample-exit-a1",
-  "preferences": {
-    "avoid_stairs": false
-  }
-}
-```
-
-## 9. データ補正の方法
-
-`data/overrides/places.csv`へ地点を追加します。
-
-```csv
-id,type,name,operator,floor,lon,lat,source_url,verified_on_site,note
-```
-
-- `type`: `gate`または`exit`
-- `floor`: `B2`、`B1`、`1F`等
-- `lon` / `lat`: WGS84（EPSG:4326）
-- `source_url`: 根拠となる公開ページ
-- `verified_on_site`: 現地確認済みなら`true`
-
-変換時に最寄りノードへスナップされます。既定の許容距離を超える地点は除外され、警告として記録されます。
-
-## 10. 提出前の確認
-
-1. `python scripts/fetch_open_data.py`が成功する。
-2. `python scripts/build_dataset.py`が`data_mode=open-data`を生成する。
-3. `/api/health`の`data_mode`が`open-data`である。
-4. 少なくとも3組の改札・出口で経路を手動確認する。
-5. 改札・出口の位置を現地確認し、`verified_on_site`を更新する。
-6. 全テスト、型検査、Lint、本番ビルドを実行する。
-7. `docs/data-audit.md`へ確認結果を記録する。
-
-## 11. 現時点の制約
-
-- 公開データの更新日以後に生じた通路変更・工事規制は自動反映しません。
-- 営業時間、一時閉鎖、混雑度を考慮しません。
-- 補正表の初期行は実装確認用であり、提出前の現地検証が必要です。
-- ナビゲーション結果は参考情報です。現地の案内表示・係員の指示を優先してください。
+- [構成](docs/architecture.md)
+- [Windows設定](docs/windows-setup.md)
+- [ローカル開発](docs/local-development.md)
+- [公開](docs/deployment.md)
+- [Android](docs/android-build.md)
+- [オフライン設計](docs/offline-design.md)
+- [データ出典](docs/data-sources.md)
+- [管理運用](docs/admin-operation.md)
+- [現地確認](docs/field-verification.md)
+- [プライバシー](PRIVACY.md) / [セキュリティ](SECURITY.md)

@@ -23,7 +23,8 @@ export function placeOptionLabel(place: Place): string {
   return [
     place.name,
     place.operator,
-    place.direction,
+    place.road_or_direction ?? place.direction,
+    ...place.nearby_landmarks.map((item) => item.name),
     place.floor,
     sourceId,
   ].join("｜");

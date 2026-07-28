@@ -28,6 +28,7 @@ def repository_with_graph(graph: nx.MultiDiGraph, places: list[Place]) -> Public
         links_geojson={"type": "FeatureCollection", "features": []},
         floor_map_geojson={"type": "FeatureCollection", "features": []},
         places=places,
+        facilities=[],
         landmarks=[],
         manifest={
             "data_mode": "fixture",
@@ -162,3 +163,42 @@ def test_one_way_edge_is_not_treated_as_bidirectional() -> None:
             avoid_stairs=False,
         )
 
+
+def test_route_features_keep_start_to_destination_sequence_for_arrows() -> None:
+    graph = nx.MultiDiGraph()
+    graph.add_node("a", lon=139.7, lat=35.69, floor="B1")
+    graph.add_node("b", lon=139.7001, lat=35.6901, floor="B1")
+    graph.add_node("c", lon=139.7002, lat=35.6902, floor="1F")
+    add_edge(graph, "a", "b", 18)
+    add_edge(graph, "b", "c", 6, "elevator", vertical=True)
+    start, destination = places()
+    repository = repository_with_graph(graph, [start, destination])
+
+    route = calculate_route(
+        repository, settings(), start, destination, avoid_stairs=False
+    )
+    features = route.route_by_floor["B1"].features
+
+    assert [feature["properties"]["sequence"] for feature in features] == [0, 1]
+    assert features[0]["geometry"]["coordinates"][0] == [139.7, 35.69]
+    assert features[0]["geometry"]["coordinates"][-1] == [139.7001, 35.6901]
+
+
+def test_long_planar_segment_gets_conservative_compass_instruction() -> None:
+    graph = nx.MultiDiGraph()
+    graph.add_node("a", lon=139.7, lat=35.69, floor="B1")
+    graph.add_node("b", lon=139.7003, lat=35.6903, floor="B1")
+    graph.add_node("c", lon=139.7004, lat=35.6904, floor="1F")
+    add_edge(graph, "a", "b", 42)
+    add_edge(graph, "b", "c", 6, "elevator", vertical=True)
+    start, destination = places()
+    repository = repository_with_graph(graph, [start, destination])
+
+    route = calculate_route(
+        repository, settings(), start, destination, avoid_stairs=False
+    )
+
+    assert any(
+        "北東へ約42メートル進みます" in instruction.text
+        for instruction in route.instructions
+    )

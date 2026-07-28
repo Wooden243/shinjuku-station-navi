@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -9,12 +10,13 @@ from typing import Any
 import networkx as nx
 
 from app.core.errors import DataLoadError
-from app.schemas.api import Landmark, Place
+from app.schemas.api import Facility, Landmark, Place
 
 REQUIRED_FILES = (
     "nodes.geojson",
     "links.geojson",
     "places.json",
+    "facilities.json",
     "landmarks.json",
     "floor_map.geojson",
     "manifest.json",
@@ -48,6 +50,7 @@ class PublicDataRepository:
     links_geojson: dict[str, Any]
     floor_map_geojson: dict[str, Any]
     places: list[Place]
+    facilities: list[Facility]
     landmarks: list[Landmark]
     manifest: dict[str, Any]
     directory: Path
@@ -108,11 +111,26 @@ def load_public_data(directory: Path) -> PublicDataRepository:
         raise DataLoadError("API用データのCRSはEPSG:4326である必要があります")
     if manifest.get("distance_unit") != "meter":
         raise DataLoadError("リンク距離単位はmeterである必要があります")
+    output_records = {
+        str(record.get("filename")): record
+        for record in manifest.get("outputs", [])
+        if isinstance(record, dict)
+    }
+    for filename in REQUIRED_FILES:
+        if filename == "manifest.json" or filename not in output_records:
+            continue
+        digest = hashlib.sha256((directory / filename).read_bytes()).hexdigest()
+        if digest != output_records[filename].get("sha256"):
+            raise DataLoadError(f"処理済みデータのSHA-256が一致しません: {filename}")
 
     nodes = _read_json(directory / "nodes.geojson")
     links = _read_json(directory / "links.geojson")
     floor_map = _read_json(directory / "floor_map.geojson")
     places = [Place.model_validate(item) for item in _read_json(directory / "places.json")]
+    facilities = [
+        Facility.model_validate(item)
+        for item in _read_json(directory / "facilities.json")
+    ]
     landmarks = [
         Landmark.model_validate(item)
         for item in _read_json(directory / "landmarks.json")
@@ -178,6 +196,26 @@ def load_public_data(directory: Path) -> PublicDataRepository:
     for place in places:
         if place.node_id not in graph:
             raise DataLoadError(f"地点 {place.id} の接続先Nav Nodeが存在しません")
+    graph_floors = {str(attrs["floor"]) for _, attrs in graph.nodes(data=True)}
+    for facility in facilities:
+        if facility.floor not in graph_floors:
+            raise DataLoadError(f"施設 {facility.id} の階層が経路データに存在しません")
+        if not (139.65 <= facility.lon <= 139.75 and 35.65 <= facility.lat <= 35.75):
+            raise DataLoadError(f"施設 {facility.id} のEPSG:4326座標が範囲外です")
+        if data_mode == "open-data" and facility.is_sample:
+            raise DataLoadError("公開データバンドルにサンプル施設を混在できません")
+    expected_counts = {
+        "node_count": graph.number_of_nodes(),
+        "link_count": len(links.get("features", [])),
+        "gate_count": sum(place.type == "gate" for place in places),
+        "exit_count": sum(place.type == "exit" for place in places),
+        "facility_count": len(facilities),
+    }
+    for field, actual in expected_counts.items():
+        if int(manifest.get(field, -1)) != actual:
+            raise DataLoadError(
+                f"manifestの{field}={manifest.get(field)}と実件数{actual}が一致しません"
+            )
 
     return PublicDataRepository(
         graph=graph,
@@ -185,6 +223,7 @@ def load_public_data(directory: Path) -> PublicDataRepository:
         links_geojson=links,
         floor_map_geojson=floor_map,
         places=places,
+        facilities=facilities,
         landmarks=landmarks,
         manifest=manifest,
         directory=directory,

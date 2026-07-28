@@ -6,6 +6,7 @@ from itertools import pairwise
 from typing import Any
 
 import networkx as nx
+from pyproj import Geod
 
 from app.core.config import Settings
 from app.core.errors import RouteNotFoundError
@@ -30,6 +31,35 @@ TRANSITION_LABELS = {
     "ramp": "スロープ",
     "vertical": "階層移動設備（種別不明）",
 }
+GEOD = Geod(ellps="WGS84")
+
+
+def _movement_text(
+    graph: nx.MultiDiGraph,
+    start_node: str,
+    end_node: str,
+    floor: str,
+    distance: float,
+    *,
+    at_junction: bool = False,
+) -> str:
+    start = graph.nodes[start_node]
+    end = graph.nodes[end_node]
+    azimuth, _back_azimuth, measured = GEOD.inv(
+        float(start["lon"]),
+        float(start["lat"]),
+        float(end["lon"]),
+        float(end["lat"]),
+    )
+    direction = ""
+    if distance >= 15 and measured >= 5:
+        labels = ("北", "北東", "東", "南東", "南", "南西", "西", "北西")
+        direction = labels[int(((azimuth % 360) + 22.5) // 45) % 8] + "へ"
+    prefix = direction or f"{floor}を"
+    suffix = "。"
+    if at_junction:
+        suffix = "。分岐では地図上の次の通路へ進みます。"
+    return f"{prefix}約{round(distance):.0f}メートル進みます{suffix}"
 
 
 def _eligible_edges(
@@ -123,6 +153,7 @@ def _instructions(
     order = 2
     accumulated = 0.0
     segment_floor = str(graph.nodes[path[0]]["floor"])
+    segment_start_node = path[0]
     neighbor_counts = {
         node_id: len(set(graph.predecessors(node_id)) | set(graph.successors(node_id)))
         for node_id in path
@@ -142,7 +173,13 @@ def _instructions(
                     Instruction(
                         order=order,
                         floor=segment_floor,
-                        text=f"{segment_floor}を約{round(accumulated):.0f}メートル進みます。",
+                        text=_movement_text(
+                            graph,
+                            segment_start_node,
+                            source,
+                            segment_floor,
+                            accumulated,
+                        ),
                         distance_meters=round(accumulated, 1),
                     )
                 )
@@ -165,6 +202,7 @@ def _instructions(
             )
             order += 1
             segment_floor = target_floor
+            segment_start_node = target
             continue
 
         accumulated += length
@@ -177,9 +215,13 @@ def _instructions(
                 Instruction(
                     order=order,
                     floor=segment_floor,
-                    text=(
-                        f"{segment_floor}を約{round(accumulated):.0f}メートル進み、"
-                        "分岐では地図上の次の通路へ進みます。"
+                    text=_movement_text(
+                        graph,
+                        segment_start_node,
+                        target,
+                        segment_floor,
+                        accumulated,
+                        at_junction=True,
                     ),
                     distance_meters=round(accumulated, 1),
                     coordinate=[
@@ -190,13 +232,20 @@ def _instructions(
             )
             order += 1
             accumulated = 0.0
+            segment_start_node = target
 
     if accumulated > 0:
         instructions.append(
             Instruction(
                 order=order,
                 floor=segment_floor,
-                text=f"{segment_floor}を約{round(accumulated):.0f}メートル進みます。",
+                text=_movement_text(
+                    graph,
+                    segment_start_node,
+                    path[-1],
+                    segment_floor,
+                    accumulated,
+                ),
                 distance_meters=round(accumulated, 1),
             )
         )
@@ -206,7 +255,8 @@ def _instructions(
             order=order,
             floor=destination.floor,
             text=(
-                f"{destination.name}に到着します。現地の案内表示と通行状況を確認してください。"
+                f"{destination.name}から地上へ出ます。"
+                "現地の案内表示と通行状況を確認してください。"
             ),
             coordinate=[destination.lon, destination.lat],
         )
@@ -260,6 +310,10 @@ def calculate_route(
                     "type": "Feature",
                     "properties": {
                         "id": edge["id"],
+                        "sequence": index,
+                        "from_node": source,
+                        "to_node": target,
+                        "direction": "start-to-destination",
                         "floor": floor,
                         "link_type": edge["link_type"],
                         "is_transition": source_floor != target_floor
@@ -328,6 +382,8 @@ def calculate_route(
             catalog_url=str(manifest["catalog_url"]),
             specification_revision=manifest.get("specification_revision"),
             generated_at=manifest.get("generated_at"),
+            source_updated_at=manifest.get("source_updated_at"),
             source_map_version=manifest.get("source_map_version"),
+            dataset_version=manifest.get("dataset_version"),
         ),
     )

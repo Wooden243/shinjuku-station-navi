@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import re
@@ -27,6 +28,18 @@ GEOD = Geod(ellps="WGS84")
 KNOWN_FACILITIES = {"stairs", "escalator", "elevator", "ramp", "movingwalkway", "step"}
 VERTICAL_FACILITIES = {"stairs", "escalator", "elevator", "movingwalkway", "vertical"}
 EXIT_NAME_PATTERN = re.compile(r"^[A-Z]{0,2}\d{1,2}[A-Z]?$|^[A-Z]$")
+FACILITY_LABELS = {
+    "stairs": ("stairs", "階段"),
+    "escalator": ("escalator", "エスカレーター"),
+    "elevator": ("elevator", "エレベーター"),
+    "ramp": ("other", "スロープ"),
+    "movingwalkway": ("other", "動く歩道"),
+    "bathroom": ("toilet", "トイレ"),
+    "universalaccesstoilet": ("toilet", "バリアフリートイレ"),
+    "ostomate": ("toilet", "オストメイト対応設備"),
+}
+PUBLIC_DATA_PROVENANCE = "open-data"
+DERIVED_PUBLIC_DATA_PROVENANCE = "derived-open-data"
 
 
 def zip_member(archive: zipfile.ZipFile, basename: str) -> str:
@@ -312,6 +325,246 @@ def entity_name(entity: dict[str, Any]) -> str:
     return str(entity.get("properties", {}).get("name", "")).strip()
 
 
+def feature_point(feature: dict[str, Any]) -> tuple[float, float] | None:
+    location = feature.get("location", {})
+    coordinates = location.get("coordinates", [])
+    if len(coordinates) >= 2:
+        return float(coordinates[0]), float(coordinates[1])
+    geometry_payload = feature.get("geometry")
+    if not geometry_payload:
+        return None
+    geometry = shape(geometry_payload)
+    if geometry.is_empty:
+        return None
+    point = geometry.representative_point()
+    return float(point.x), float(point.y)
+
+
+def entity_geometry_ids(entity: dict[str, Any]) -> list[int]:
+    result: list[int] = []
+    for reference in entity.get("properties", {}).get("geometry", []):
+        if not isinstance(reference, list) or not reference:
+            continue
+        try:
+            result.append(int(reference[0]))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def classify_entity_facility(name: str, public_category: str) -> str:
+    normalized = name.casefold()
+    if re.search(r"トイレ|便所|toilet", normalized):
+        return "toilet"
+    if re.search(r"\batm\b|銀行.*atm|現金自動", normalized):
+        return "atm"
+    if re.search(r"ロッカー|locker", normalized):
+        return "coin_locker"
+    if re.search(r"案内所|information|インフォメーション", normalized):
+        return "information"
+    if re.search(r"公衆電話|public phone", normalized):
+        return "public_phone"
+    if re.search(r"エレベーター|elevator", normalized):
+        return "elevator"
+    if re.search(r"エスカレーター|escalator", normalized):
+        return "escalator"
+    if re.search(r"待ち合わせ|meeting", normalized):
+        return "meeting_point"
+    if re.search(
+        r"コンビニ|セブン.?イレブン|ファミリーマート|ローソン|newdays",
+        normalized,
+    ):
+        return "convenience_store"
+    if re.search(r"ドラッグ|薬局|pharmacy", normalized):
+        return "drugstore"
+    if re.search(r"カフェ|珈琲|coffee|cafe", normalized):
+        return "cafe"
+    if "レストラン" in public_category or "デリ" in public_category:
+        return "restaurant"
+    if public_category:
+        return "shop"
+    return "other"
+
+
+def build_facilities(
+    entities: dict[int, dict[str, Any]],
+    geometry_by_id: dict[int, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    facilities: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    seen_locations: set[tuple[int, str]] = set()
+
+    for entity_id, entity in entities.items():
+        properties = entity.get("properties", {})
+        name = entity_name(entity)
+        if not name:
+            continue
+        related = [
+            geometry_by_id[geometry_id]
+            for geometry_id in entity_geometry_ids(entity)
+            if geometry_id in geometry_by_id
+        ]
+        if not related:
+            continue
+        if any(
+            feature.get("properties", {}).get("barrier") == "gate"
+            or feature.get("properties", {}).get("marker") == "entrance"
+            for feature in related
+        ):
+            continue
+        has_public_details = any(
+            str(properties.get(field, "")).strip()
+            for field in (
+                "hours",
+                "category",
+                "description",
+                "phone",
+                "url",
+                "street address",
+            )
+        )
+        public_category = str(properties.get("category", "")).strip()
+        category = classify_entity_facility(name, public_category)
+        if not has_public_details and category == "other":
+            continue
+        for feature in related:
+            point = feature_point(feature)
+            if point is None:
+                warnings.append(
+                    f"Facility entity {entity_id} geometry {feature['id']} has no usable point"
+                )
+                continue
+            floor = str(feature["_floor"])
+            location_key = (entity_id, floor)
+            if location_key in seen_locations:
+                continue
+            seen_locations.add(location_key)
+            lon, lat = point
+            facilities.append(
+                {
+                    "id": f"facility-entity-{entity_id}-{floor}",
+                    "name": name,
+                    "category": category,
+                    "floor": floor,
+                    "lon": round(lon, 7),
+                    "lat": round(lat, 7),
+                    "description": str(properties.get("description", "")).strip() or None,
+                    "hours": str(properties.get("hours", "")).strip() or None,
+                    "payment_notes": None,
+                    "phone": str(properties.get("phone", "")).strip() or None,
+                    "url": str(properties.get("url", "")).strip() or None,
+                    "public_category": public_category or None,
+                    "source_entity_id": entity_id,
+                    "source_geometry_id": int(feature["id"]),
+                    "publication_status": "published",
+                    "verification_status": "not-verified",
+                    "support_count": 0,
+                    "is_sample": False,
+                    "provenance": {
+                        "name": PUBLIC_DATA_PROVENANCE,
+                        "category": DERIVED_PUBLIC_DATA_PROVENANCE,
+                        "floor": PUBLIC_DATA_PROVENANCE,
+                        "coordinates": PUBLIC_DATA_PROVENANCE,
+                        "description": (
+                            PUBLIC_DATA_PROVENANCE
+                            if properties.get("description")
+                            else "no-data"
+                        ),
+                        "hours": (
+                            PUBLIC_DATA_PROVENANCE
+                            if properties.get("hours")
+                            else "no-data"
+                        ),
+                        "payment_notes": "no-data",
+                    },
+                }
+            )
+
+    for feature in geometry_by_id.values():
+        public_type = facility_type(feature)
+        normalized_type = "stairs" if public_type == "step" else public_type
+        if normalized_type not in FACILITY_LABELS:
+            continue
+        point = feature_point(feature)
+        if point is None:
+            continue
+        category, label = FACILITY_LABELS[normalized_type]
+        lon, lat = point
+        facilities.append(
+            {
+                "id": f"facility-geometry-{feature['id']}",
+                "name": label,
+                "category": category,
+                "floor": str(feature["_floor"]),
+                "lon": round(lon, 7),
+                "lat": round(lat, 7),
+                "description": f"公開階層図形に記録された{label}です。",
+                "hours": None,
+                "payment_notes": None,
+                "phone": None,
+                "url": None,
+                "public_category": normalized_type,
+                "source_entity_id": None,
+                "source_geometry_id": int(feature["id"]),
+                "publication_status": "published",
+                "verification_status": "not-verified",
+                "support_count": 0,
+                "is_sample": False,
+                "provenance": {
+                    "name": DERIVED_PUBLIC_DATA_PROVENANCE,
+                    "category": DERIVED_PUBLIC_DATA_PROVENANCE,
+                    "floor": PUBLIC_DATA_PROVENANCE,
+                    "coordinates": PUBLIC_DATA_PROVENANCE,
+                    "description": DERIVED_PUBLIC_DATA_PROVENANCE,
+                    "hours": "no-data",
+                    "payment_notes": "no-data",
+                },
+            }
+        )
+    return facilities, warnings
+
+
+def add_nearby_facilities_to_exits(
+    places: list[dict[str, Any]],
+    facilities: list[dict[str, Any]],
+    *,
+    radius_m: float = 60.0,
+) -> None:
+    candidates = [
+        item
+        for item in facilities
+        if item["category"]
+        not in {"stairs", "escalator", "elevator", "toilet", "other"}
+    ]
+    for place in places:
+        if place["type"] != "exit":
+            continue
+        nearby: list[tuple[float, str]] = []
+        for facility in candidates:
+            distance = geodesic_m(
+                (float(place["lon"]), float(place["lat"])),
+                (float(facility["lon"]), float(facility["lat"])),
+            )
+            if distance <= radius_m:
+                nearby.append((distance, str(facility["name"])))
+        selected: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+        for distance, name in sorted(nearby):
+            normalized_name = name.casefold()
+            if normalized_name in seen_names:
+                continue
+            seen_names.add(normalized_name)
+            selected.append(
+                {"name": name, "distance_meters": round(distance, 1)}
+            )
+            if len(selected) == 3:
+                break
+        place["nearby_landmarks"] = selected
+        place["provenance"]["nearby_landmarks"] = (
+            DERIVED_PUBLIC_DATA_PROVENANCE if nearby else "no-data"
+        )
+
+
 def build_places(
     entities: dict[int, dict[str, Any]],
     geometry_by_id: dict[int, dict[str, Any]],
@@ -346,6 +599,7 @@ def build_places(
             )
             continue
         source_entity_id = int(entity["id"]) if entity else None
+        entity_properties = entity.get("properties", {}) if entity else {}
         places.append(
             {
                 "id": f"gate-{source_entity_id or feature['id']}",
@@ -361,6 +615,33 @@ def build_places(
                 "source_entity_id": source_entity_id,
                 "source_geometry_id": int(feature["id"]),
                 "verified_on_site": False,
+                "exit_number": None,
+                "official_name": name,
+                "road_or_direction": None,
+                "nearby_landmarks": [],
+                "equipment": [],
+                "accessibility": None,
+                "available_hours": (
+                    str(entity_properties.get("hours", "")).strip() or None
+                ),
+                "closure_notes": [],
+                "verification_status": "not-verified",
+                "provenance": {
+                    "name": PUBLIC_DATA_PROVENANCE,
+                    "floor": PUBLIC_DATA_PROVENANCE,
+                    "coordinates": PUBLIC_DATA_PROVENANCE,
+                    "road_or_direction": "no-data",
+                    "nearby_landmarks": "no-data",
+                    "equipment": "no-data",
+                    "accessibility": "no-data",
+                    "available_hours": (
+                        PUBLIC_DATA_PROVENANCE
+                        if entity_properties.get("hours")
+                        else "no-data"
+                    ),
+                    "closure_notes": "no-data",
+                    "verification_status": "unverified",
+                },
             }
         )
 
@@ -409,7 +690,7 @@ def build_places(
                 "type": "exit",
                 "name": f"{name}出口",
                 "operator": "公開データに事業者記載なし",
-                "direction": "地上出入口",
+                "direction": "情報なし",
                 "floor": "1F",
                 "lon": round(lon, 7),
                 "lat": round(lat, 7),
@@ -418,6 +699,35 @@ def build_places(
                 "source_entity_id": entity_id,
                 "source_geometry_id": int(feature["id"]),
                 "verified_on_site": False,
+                "exit_number": name,
+                "official_name": f"{name}出口",
+                "road_or_direction": None,
+                "nearby_landmarks": [],
+                "equipment": [],
+                "accessibility": None,
+                "available_hours": (
+                    str(entity.get("properties", {}).get("hours", "")).strip()
+                    or None
+                ),
+                "closure_notes": [],
+                "verification_status": "not-verified",
+                "provenance": {
+                    "exit_number": PUBLIC_DATA_PROVENANCE,
+                    "name": DERIVED_PUBLIC_DATA_PROVENANCE,
+                    "floor": PUBLIC_DATA_PROVENANCE,
+                    "coordinates": PUBLIC_DATA_PROVENANCE,
+                    "road_or_direction": "no-data",
+                    "nearby_landmarks": "no-data",
+                    "equipment": "no-data",
+                    "accessibility": "no-data",
+                    "available_hours": (
+                        PUBLIC_DATA_PROVENANCE
+                        if entity.get("properties", {}).get("hours")
+                        else "no-data"
+                    ),
+                    "closure_notes": "no-data",
+                    "verification_status": "unverified",
+                },
             }
         )
 
@@ -455,20 +765,46 @@ def apply_place_overrides(places: list[dict[str, Any]]) -> tuple[list[dict[str, 
                 continue
             if action != "update":
                 raise ValueError(f"Override line {line_number} has invalid action {action!r}")
-            for field in ("name", "operator", "direction", "floor", "node_id"):
+            changed_fields: list[str] = []
+            for field in (
+                "name",
+                "official_name",
+                "operator",
+                "direction",
+                "road_or_direction",
+                "accessibility",
+                "available_hours",
+                "floor",
+                "node_id",
+            ):
                 value = str(row.get(field, "")).strip()
                 if value:
                     place[field] = value
+                    changed_fields.append(field)
             for field in ("lon", "lat"):
                 value = str(row.get(field, "")).strip()
                 if value:
                     place[field] = float(value)
+                    changed_fields.append("coordinates")
+            for field in ("equipment", "closure_notes"):
+                value = str(row.get(field, "")).strip()
+                if value:
+                    place[field] = [
+                        item.strip() for item in value.split("|") if item.strip()
+                    ]
+                    changed_fields.append(field)
             place["verified_on_site"] = (
                 str(row.get("verified_on_site", "")).strip().lower() == "true"
             )
+            if place["verified_on_site"]:
+                place["verification_status"] = "verified-on-site"
+                changed_fields.append("verification_status")
             place["override_evidence_url"] = evidence
             place["override_verified_at"] = str(row.get("verified_at", "")).strip() or None
             place["override_note"] = note
+            provenance = place.setdefault("provenance", {})
+            for field in changed_fields:
+                provenance[field] = "admin-correction"
     return [place for place in places if not place.pop("_excluded", False)], warnings
 
 
@@ -554,6 +890,30 @@ def write_json(filename: str, payload: Any) -> None:
     )
 
 
+def output_record(filename: str, *, count: int | None = None) -> dict[str, Any]:
+    path = OUTPUT_DIR / filename
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    record: dict[str, Any] = {
+        "filename": filename,
+        "sha256": digest,
+        "bytes": path.stat().st_size,
+    }
+    if count is not None:
+        record["count"] = count
+    return record
+
+
+def manual_override_count() -> int:
+    if not OVERRIDES_PATH.is_file():
+        return 0
+    with OVERRIDES_PATH.open(encoding="utf-8-sig", newline="") as handle:
+        return sum(
+            1
+            for row in csv.DictReader(handle)
+            if row and str(row.get("source_entity_id", "")).strip()
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="東京都新宿駅データをアプリ用に正規化します。")
     parser.add_argument("--max-snap-m", type=float, default=50.0)
@@ -603,6 +963,9 @@ def main() -> int:
         places, override_warnings = apply_place_overrides(places)
         warnings.extend(override_warnings)
         floor_map = build_floor_map(geometry_by_floor)
+        facilities, facility_warnings = build_facilities(entities, geometry_by_id)
+        warnings.extend(facility_warnings)
+        add_nearby_facilities_to_exits(places, facilities)
 
     if not any(place["type"] == "gate" for place in places):
         raise ValueError("No gates were classified from public data")
@@ -617,6 +980,19 @@ def main() -> int:
         if resource["filename"] == ZIP_PATH.name
     )
     generated_at = datetime.now(UTC).isoformat()
+    dataset_version = f"{raw_zip['sha256'][:16]}-map-{int(nav['v'])}"
+    source_reference = {
+        "title": raw_manifest["dataset"]["title"],
+        "provider": raw_manifest["dataset"]["provider"],
+        "url": raw_manifest["dataset"]["catalog_url"],
+        "license": raw_manifest["dataset"]["license"],
+        "retrieved_at": raw_zip["retrieved_at"],
+    }
+    source_updated_at = raw_manifest["dataset"].get("resource_updated_at")
+    for item in [*places, *facilities]:
+        item["source"] = source_reference
+        item["data_updated_at"] = source_updated_at
+
     manifest = {
         "data_mode": "open-data",
         "title": raw_manifest["dataset"]["title"],
@@ -626,6 +1002,8 @@ def main() -> int:
         "license_url": raw_manifest["dataset"]["license_url"],
         "specification_revision": raw_manifest["dataset"]["specification_revision"],
         "generated_at": generated_at,
+        "dataset_version": dataset_version,
+        "source_updated_at": source_updated_at,
         "crs": "EPSG:4326",
         "distance_unit": "meter",
         "raw_resource": raw_zip,
@@ -635,7 +1013,9 @@ def main() -> int:
         "link_count": len(links_geojson["features"]),
         "gate_count": sum(place["type"] == "gate" for place in places),
         "exit_count": sum(place["type"] == "exit" for place in places),
+        "facility_count": len(facilities),
         "landmark_count": len(landmarks),
+        "manual_override_count": manual_override_count(),
         "floors": floors,
         "warnings": sorted(set(warnings)),
         "transformation": {
@@ -644,6 +1024,14 @@ def main() -> int:
             "link_distance": "public dm; WGS84 geodesic only for invalid/missing dm",
             "unknown_floors": "rejected",
             "manual_overrides": str(OVERRIDES_PATH.relative_to(PROJECT_ROOT)),
+            "facility_entities": (
+                "named Community Entities with public details plus explicit "
+                "facility geometries; no sample shops"
+            ),
+            "exit_nearby_landmarks": (
+                "up to three non-equipment public facilities within 60 meters; "
+                "reported as derived open data, not as an exit direction"
+            ),
         },
     }
     classification_report.update(
@@ -658,14 +1046,28 @@ def main() -> int:
     write_json("nodes.geojson", nodes_geojson)
     write_json("links.geojson", links_geojson)
     write_json("places.json", sorted(places, key=lambda place: (place["type"], place["name"])))
+    write_json(
+        "facilities.json",
+        sorted(facilities, key=lambda item: (item["floor"], item["category"], item["name"])),
+    )
     write_json("landmarks.json", landmarks)
     write_json("floor_map.geojson", floor_map)
     write_json("classification-report.json", classification_report)
+    manifest["outputs"] = [
+        output_record("nodes.geojson", count=len(nodes_geojson["features"])),
+        output_record("links.geojson", count=len(links_geojson["features"])),
+        output_record("places.json", count=len(places)),
+        output_record("facilities.json", count=len(facilities)),
+        output_record("landmarks.json", count=len(landmarks)),
+        output_record("floor_map.geojson", count=len(floor_map["features"])),
+        output_record("classification-report.json"),
+    ]
     write_json("manifest.json", manifest)
     print(
         "Built open-data bundle: "
         f"{manifest['node_count']} nodes, {manifest['link_count']} links, "
-        f"{manifest['gate_count']} gates, {manifest['exit_count']} exits"
+        f"{manifest['gate_count']} gates, {manifest['exit_count']} exits, "
+        f"{manifest['facility_count']} facilities"
     )
     print(f"Warnings: {len(manifest['warnings'])}")
     return 0
